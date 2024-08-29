@@ -59,7 +59,7 @@ def query_samples(context: AssetExecutionContext):
     return query_samples_
 
 
-@asset(group_name="query", compute_kind="python")
+@asset(group_name="query", compute_kind="modal-lab")
 def query_results(context: AssetExecutionContext, query_samples, pdf_embeddings_table):
     VisionRAG = modal.Cls.lookup("vision_retrieval", "VisionRAG")
     vision_rag = VisionRAG()

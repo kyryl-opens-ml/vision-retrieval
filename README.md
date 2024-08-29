@@ -32,7 +32,7 @@ modal deploy vision_retrieval/infra.py
 ## Develop
 
 ```
-modal run vision_retrieval/infra.py
+modal shell vision_retrieval/infra.py
 ```
 
 ## Orchestrate
