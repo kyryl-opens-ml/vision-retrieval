@@ -1,6 +1,7 @@
 import os
-import modal
 from typing import List
+
+import modal
 
 
 def download_model_to_image(model_dir, model_name):
@@ -85,8 +86,9 @@ class VisionRAG:
 
     @modal.method()
     def ask_llm_example(self):
-        import requests
         import PIL.Image
+        import requests
+
         from vision_retrieval.core import run_vision_inference
 
         images = []
@@ -105,8 +107,9 @@ class VisionRAG:
     @modal.method()
     def ingest_data(self, pdf_urls: List[str], table_name: str, db_path: str):
         print("1. Downloads PDFs")
-        from vision_retrieval.core import download_pdf, embedd_docs, create_db
         from tqdm import tqdm
+
+        from vision_retrieval.core import create_db, download_pdf, embedd_docs
         pdfs = []
         for pdf_url in tqdm(pdf_urls):
             pdf_file_name = download_pdf(url=pdf_url)
@@ -124,7 +127,7 @@ class VisionRAG:
 
     @modal.method()
     def query_data(self, user_query: str, table_name: str, db_path: str):
-        from vision_retrieval.core import search, run_vision_inference
+        from vision_retrieval.core import run_vision_inference, search
 
         print("1. Search relevant images")
         im, meta = search(
@@ -155,7 +158,6 @@ class VisionRAG:
 @app.local_entrypoint()
 def main():
     vision_rag = VisionRAG()
-
     # pdf_urls = ["https://vision-retrieval.s3.amazonaws.com/docs/budget-2024.pdf", "https://vision-retrieval.s3.amazonaws.com/docs/CartaVCFundPerformanceQ12024.pdf", "https://vision-retrieval.s3.amazonaws.com/docs/InfraRedReport.pdf"]
     pdf_urls = ["https://vision-retrieval.s3.amazonaws.com/docs/InfraRedReport.pdf"]
     db_path = "s3://vision-retrieval/storage"

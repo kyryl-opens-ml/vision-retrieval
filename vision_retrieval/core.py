@@ -1,12 +1,14 @@
-import PIL.Image
-import PIL
-import numpy as np
-
-import torch
-from torch.utils.data import DataLoader
-from tqdm import tqdm
-from transformers import AutoProcessor
+import base64
+import io
+import os
 from typing import Optional
+
+import lancedb
+import numpy as np
+import PIL
+import PIL.Image
+import requests
+import torch
 from colpali_engine.models.paligemma_colbert_architecture import ColPali
 from colpali_engine.trainer.retrieval_evaluator import CustomEvaluator
 from colpali_engine.utils.colpali_processing_utils import (
@@ -14,18 +16,11 @@ from colpali_engine.utils.colpali_processing_utils import (
     process_queries,
 )
 from colpali_engine.utils.image_utils import get_base64_image
-import lancedb
-import base64
-import io
-
-from transformers import AutoModelForCausalLM
-
-import requests
 from pdf2image import convert_from_path
 from pypdf import PdfReader
-
-
-import os
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+from transformers import AutoModelForCausalLM, AutoProcessor
 
 
 def base64_to_pil(base64_str: str) -> PIL.Image.Image:
@@ -172,9 +167,7 @@ def search(query, table_name: str, model, processor, db_path: str = "lancedb"):
     qs = get_query_embedding(query=query, model=model, processor=processor)
     db = lancedb.connect(db_path)
     table = db.open_table(table_name)
-    # Search over all docs
     r = table.search().limit(1000).to_list()
-    # r = table.search().to_list()
 
     def marge_patch(record):
         patches = np.array([record[f"patch_{idx}"] for idx in range(1030)])
@@ -186,7 +179,6 @@ def search(query, table_name: str, model, processor, db_path: str = "lancedb"):
     scores = retriever_evaluator.evaluate_colbert([qs["embeddings"]], all_pages_embeddings)
     # TODO: return top k images
     page = r[scores.argmax(axis=1)]
-    # print(page['image'])
     pil_image = base64_to_pil(page["image"])
     meta = {"name": page["name"], "page_idx": page["page_idx"]}
     return pil_image, meta
@@ -195,10 +187,6 @@ def search(query, table_name: str, model, processor, db_path: str = "lancedb"):
 def get_model_phi_vision(model_id: Optional[str] = None):
     if model_id is None:
         model_id = "microsoft/Phi-3.5-vision-instruct"
-
-    # model_id = "microsoft/Phi-3.5-vision-instruct"
-    # model_id = "/vol/models/Phi-3.5-vision-instruct"
-
     # Note: set _attn_implementation='eager' if you don't have flash_attn installed
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
@@ -208,7 +196,6 @@ def get_model_phi_vision(model_id: Optional[str] = None):
         # _attn_implementation='flash_attention_2'
         _attn_implementation="eager",
     )
-
     # for best performance, use num_crops=4 for multi-frame, num_crops=16 for single-frame.
     processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True, num_crops=4)
     return model, processor
@@ -238,7 +225,6 @@ def run_vision_inference(input_images: PIL.Image, prompt: str, model, processor)
     }
 
     generate_ids = model.generate(**inputs, eos_token_id=processor.tokenizer.eos_token_id, **generation_args)
-
     # remove input tokens
     generate_ids = generate_ids[:, inputs["input_ids"].shape[1] :]
     response = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]

@@ -1,9 +1,7 @@
-from dagster import asset, MetadataValue, AssetExecutionContext
-import modal
 import lancedb
-
+import modal
 import nest_asyncio
-import asyncio
+from dagster import AssetExecutionContext, MetadataValue, asset
 
 # Allow nested event loops
 nest_asyncio.apply()
