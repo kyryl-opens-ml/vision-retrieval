@@ -60,7 +60,7 @@ mounts = [modal.Mount.from_local_python_packages("vision_retrieval", "vision_ret
     secrets=[modal.Secret.from_name("huggingface-secret"), modal.Secret.from_name("aws-secret")],
     mounts=mounts,
     container_idle_timeout=300,
-    keep_warm=1,
+    keep_warm=0,
     allow_concurrent_inputs=4,
 )
 class VisionRAG:
@@ -130,14 +130,14 @@ class VisionRAG:
         from vision_retrieval.core import run_vision_inference, search
 
         print("1. Search relevant images")
-        im, meta = search(
+        search_results = search(
             query=user_query,
             table_name=table_name,
             db_path=db_path,
             processor=self.processor_colpali,
             model=self.model_colpali,
         )
-        print(f"result most relevant image = {meta}")
+        print(f"result most relevant {search_results[0]}")
 
         print("2. Build prompt")
         # https://cookbook.openai.com/examples/custom_image_embedding_search#user-querying-the-most-similar-image
@@ -149,10 +149,10 @@ class VisionRAG:
 
         print("3. Query LLM with prompt and relavent images")
         response = run_vision_inference(
-            input_images=[im], prompt=prompt, model=self.model_phi_vision, processor=self.processor_phi_vision
+            input_images=[search_results[0]['pil_image']], prompt=prompt, model=self.model_phi_vision, processor=self.processor_phi_vision
         )
         print(f"response = {response}")
-        return {"response": response, "page": meta['page_idx'] + 1, "pdf_name": meta['name']}
+        return {"response": response, "page": search_results[0]['page_idx'] + 1, "pdf_name": search_results[0]['name']}
 
 
 @app.local_entrypoint()
@@ -161,7 +161,7 @@ def main():
     # pdf_urls = ["https://vision-retrieval.s3.amazonaws.com/docs/budget-2024.pdf", "https://vision-retrieval.s3.amazonaws.com/docs/CartaVCFundPerformanceQ12024.pdf", "https://vision-retrieval.s3.amazonaws.com/docs/InfraRedReport.pdf"]
     pdf_urls = ["https://vision-retrieval.s3.amazonaws.com/docs/InfraRedReport.pdf"]
     db_path = "s3://vision-retrieval/storage"
-    table_name = "tl-test-table-2"
+    table_name = "table-test"
 
     vision_rag.ingest_data.remote(pdf_urls=pdf_urls, table_name=table_name, db_path=db_path)
 
@@ -175,7 +175,7 @@ def python_main():
 
     pdf_urls = ["https://vision-retrieval.s3.amazonaws.com/docs/InfraRedReport.pdf"]
     db_path = "s3://vision-retrieval/storage"
-    table_name = "tl-test-table"
+    table_name = "table-test"
 
     vision_rag.ingest_data.remote(pdf_urls=pdf_urls, table_name=table_name, db_path=db_path)
 

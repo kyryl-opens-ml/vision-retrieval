@@ -154,34 +154,40 @@ def create_db(docs_storage, table_name: str = "demo", db_path: str = "lancedb"):
             "page_texts": x["page_text"],
             "image": get_base64_image(x["page_image"]),
             "page_idx": x["page_idx"],
+            "page_embedding_flatten": x["page_embedding"].float().numpy().flatten(),
+            "page_embedding_shape": x["page_embedding"].float().numpy().shape
         }
-        patch = {f"patch_{idx}": x["page_embedding"][idx].float().numpy() for idx in range(len(x["page_embedding"]))}
-        sample.update(patch)
         data.append(sample)
 
     table = db.create_table(table_name, data, mode="overwrite")
     return table
 
 
-def search(query, table_name: str, model, processor, db_path: str = "lancedb"):
+def search(query: str, table_name: str, model, processor, db_path: str = "lancedb", top_k: int = 3):
     qs = get_query_embedding(query=query, model=model, processor=processor)
     db = lancedb.connect(db_path)
     table = db.open_table(table_name)
-    r = table.search().limit(1000).to_list()
-
-    def marge_patch(record):
-        patches = np.array([record[f"patch_{idx}"] for idx in range(1030)])
-        page_embeddings = torch.from_numpy(patches).to(torch.bfloat16)
-        return page_embeddings
-
-    all_pages_embeddings = [marge_patch(x) for x in r]
+    # Search over all dataset
+    r = table.search().limit(None).to_list()
+    
+    def process_patch_embeddings(x):
+        patches = np.reshape(x['page_embedding_flatten'], x['page_embedding_shape'])
+        return torch.from_numpy(patches).to(torch.bfloat16)
+    
+    all_pages_embeddings = [process_patch_embeddings(x) for x in r]
+    
     retriever_evaluator = CustomEvaluator(is_multi_vector=True)
     scores = retriever_evaluator.evaluate_colbert([qs["embeddings"]], all_pages_embeddings)
-    # TODO: return top k images
-    page = r[scores.argmax(axis=1)]
-    pil_image = base64_to_pil(page["image"])
-    meta = {"name": page["name"], "page_idx": page["page_idx"]}
-    return pil_image, meta
+
+    top_k_indices = torch.topk(scores, k=top_k, dim=1).indices
+
+    results = []
+    for idx in top_k_indices[0]:
+        page = r[idx]
+        pil_image = base64_to_pil(page["image"])
+        result = {"name": page["name"], "page_idx": page["page_idx"], "pil_image": pil_image}
+        results.append(result)
+    return results
 
 
 def get_model_phi_vision(model_id: Optional[str] = None):
