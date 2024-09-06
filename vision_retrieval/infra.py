@@ -60,7 +60,7 @@ mounts = [modal.Mount.from_local_python_packages("vision_retrieval", "vision_ret
     secrets=[modal.Secret.from_name("huggingface-secret"), modal.Secret.from_name("aws-secret")],
     mounts=mounts,
     container_idle_timeout=300,
-    keep_warm=1,
+    keep_warm=0,
     allow_concurrent_inputs=4,
 )
 class VisionRAG:
